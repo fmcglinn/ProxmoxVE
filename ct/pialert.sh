@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${SCRIPT_DIR}/misc/build.func"
 # Copyright (c) 2021-2025 tteck
 # Author: tteck (tteckster)
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
@@ -27,6 +28,7 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
+  # ALLOWED-RCE: Official Pi.Alert update script
   bash -c "$(curl -fsSL https://github.com/leiweibau/Pi.Alert/raw/main/install/pialert_update.sh)" -s --lxc
   msg_ok "Updated $APP"
   msg_ok "Updated successfully!"

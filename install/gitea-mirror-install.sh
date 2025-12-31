@@ -23,6 +23,7 @@ msg_ok "Installed Dependencies"
 
 msg_info "Installing Bun"
 export BUN_INSTALL=/opt/bun
+# ALLOWED-RCE: Official Bun installer
 curl -fsSL https://bun.sh/install | $STD bash
 ln -sf /opt/bun/bin/bun /usr/local/bin/bun
 ln -sf /opt/bun/bin/bun /usr/local/bin/bunx

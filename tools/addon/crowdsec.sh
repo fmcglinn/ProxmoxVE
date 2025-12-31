@@ -73,6 +73,7 @@ msg_info "Setting up ${APP} Repository"
 apt-get update &>/dev/null
 apt-get install -y curl &>/dev/null
 apt-get install -y gnupg &>/dev/null
+# ALLOWED-RCE: Official CrowdSec repository installer
 curl -fsSL "https://install.crowdsec.net" | bash &>/dev/null
 msg_ok "Setup ${APP} Repository"
 

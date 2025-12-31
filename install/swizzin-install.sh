@@ -5,7 +5,7 @@
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 # Source: https://swizzin.ltd/
 
-source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
+source "$FUNCTIONS_FILE_PATH"
 color
 verb_ip6
 catch_errors
@@ -23,6 +23,7 @@ if [[ ! "$CONFIRM" =~ ^([yY][eE][sS]|[yY])$ ]]; then
   msg_error "Aborted by user. No changes have been made."
   exit 10
 fi
+# ALLOWED-RCE: Official Swizzin installer (user confirmed above)
 bash <(curl -fsSL https://s5n.sh)
 
 motd_ssh

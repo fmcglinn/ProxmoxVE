@@ -32,8 +32,10 @@ if ! command -v curl >/dev/null 2>&1; then
   apt update >/dev/null 2>&1
   apt install -y curl >/dev/null 2>&1
 fi
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/core.func)
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/error_handler.func)
+
+# Source function libraries from local bind mount
+source "${SCRIPTS_ROOT}/misc/core.func"
+source "${SCRIPTS_ROOT}/misc/error_handler.func"
 load_functions
 catch_errors
 
@@ -197,7 +199,8 @@ EOF
   rm -rf /usr/lib/python3.*/EXTERNALLY-MANAGED
   msg_ok "Updated Container OS"
 
-  source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/tools.func)
+  # Source tools.func from local bind mount
+  source "${SCRIPTS_ROOT}/misc/tools.func"
 }
 
 # ==============================================================================
@@ -267,7 +270,8 @@ EOF
     systemctl restart $(basename $(dirname $GETTY_OVERRIDE) | sed 's/\.d//')
     msg_ok "Customized Container"
   fi
-  echo "bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/${app}.sh)\"" >/usr/bin/update
+  # Create update script pointing to local bind mount
+  echo "bash \"${SCRIPTS_ROOT}/ct/${app}.sh\"" >/usr/bin/update
   chmod +x /usr/bin/update
 
   if [[ -n "${SSH_AUTHORIZED_KEY}" ]]; then

@@ -3140,6 +3140,7 @@ setup_mariadb() {
     if ! curl -fsI --max-time 10 http://mirror.mariadb.org/repo/ >/dev/null 2>&1; then
       msg_warn "MariaDB mirror not reachable - trying mariadb_repo_setup fallback"
       # Try using official mariadb_repo_setup script as fallback
+      # ALLOWED-RCE: Official MariaDB repository setup script
       if curl -fsSL --max-time 15 https://r.mariadb.com/downloads/mariadb_repo_setup 2>/dev/null | bash -s -- --skip-verify >/dev/null 2>&1; then
         msg_ok "MariaDB repository configured via mariadb_repo_setup"
         # Extract version from configured repo
@@ -3158,6 +3159,7 @@ setup_mariadb() {
 
       if [[ -z "$MARIADB_VERSION" ]]; then
         msg_warn "Could not parse latest GA MariaDB version from mirror - trying mariadb_repo_setup"
+        # ALLOWED-RCE: Official MariaDB repository setup script
         if curl -fsSL --max-time 15 https://r.mariadb.com/downloads/mariadb_repo_setup 2>/dev/null | bash -s -- --skip-verify >/dev/null 2>&1; then
           msg_ok "MariaDB repository configured via mariadb_repo_setup"
           MARIADB_VERSION=$(grep -oP 'repo/\K[0-9]+\.[0-9]+\.[0-9]+' /etc/apt/sources.list.d/mariadb.list 2>/dev/null | head -n1 || echo "12.2")
@@ -4596,6 +4598,7 @@ function setup_rust() {
   # Scenario 1: Rustup not installed - fresh install
   if ! command -v rustup &>/dev/null; then
     msg_info "Setup Rust ($RUST_TOOLCHAIN)"
+    # ALLOWED-RCE: Official Rustup installer from rust-lang.org
     curl -fsSL https://sh.rustup.rs | $STD sh -s -- -y --default-toolchain "$RUST_TOOLCHAIN" || {
       msg_error "Failed to install Rust"
       return 1

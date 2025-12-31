@@ -27,6 +27,7 @@ msg_info "Installing CasaOS (Patience)"
 DOCKER_CONFIG_PATH='/etc/docker/daemon.json'
 mkdir -p $(dirname $DOCKER_CONFIG_PATH)
 echo -e '{\n  "log-driver": "journald"\n}' >/etc/docker/daemon.json
+# ALLOWED-RCE: Official CasaOS installer
 $STD bash <(curl -fsSL https://get.casaos.io/)
 msg_ok "Installed CasaOS"
 

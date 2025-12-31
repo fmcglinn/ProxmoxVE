@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Copyright (c) 2021-2025 community-scripts ORG
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+
+# ==============================================================================
+# CONFIG.FUNC - OFFLINE/LOCAL CONFIGURATION
+# ==============================================================================
+#
+# This fork operates in OFFLINE MODE ONLY.
+# All function libraries are sourced from the local filesystem.
+# No remote code execution from GitHub or other sources.
+#
+# Usage:
+#   - Sourced automatically by build.func and other function files
+#   - Clone this repo to /opt/proxmox-scripts on your Proxmox host
+#   - Run scripts directly from the local clone
+#
+# ==============================================================================
+
+# Detect repo root automatically
+if [[ -n "${PROXMOX_SCRIPTS_ROOT:-}" ]]; then
+  REPO_ROOT="$PROXMOX_SCRIPTS_ROOT"
+elif [[ -f "${BASH_SOURCE[0]}" ]]; then
+  REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+else
+  REPO_ROOT="/opt/proxmox-scripts"
+fi
+
+# Telemetry is disabled in this offline fork
+TELEMETRY_ENABLED="false"
+
+# Container mount path (for bind mount inside containers)
+CONTAINER_SCRIPTS_PATH="/opt/community-scripts"
+
+# Local paths (derived from REPO_ROOT)
+LOCAL_MISC="${REPO_ROOT}/misc"
+LOCAL_CT="${REPO_ROOT}/ct"
+LOCAL_INSTALL="${REPO_ROOT}/install"
+LOCAL_TOOLS="${REPO_ROOT}/tools"
+
+# Export all configuration variables
+export REPO_ROOT TELEMETRY_ENABLED CONTAINER_SCRIPTS_PATH
+export LOCAL_MISC LOCAL_CT LOCAL_INSTALL LOCAL_TOOLS

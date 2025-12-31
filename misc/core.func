@@ -420,7 +420,11 @@ silent() {
   if [[ $rc -ne 0 ]]; then
     # Source explain_exit_code if needed
     if ! declare -f explain_exit_code >/dev/null 2>&1; then
-      source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/error_handler.func)
+      if [[ -n "${SCRIPTS_ROOT:-}" && -f "${SCRIPTS_ROOT}/misc/error_handler.func" ]]; then
+        source "${SCRIPTS_ROOT}/misc/error_handler.func"
+      elif [[ -n "${LOCAL_MISC:-}" && -f "${LOCAL_MISC}/error_handler.func" ]]; then
+        source "${LOCAL_MISC}/error_handler.func"
+      fi
     fi
 
     local explanation

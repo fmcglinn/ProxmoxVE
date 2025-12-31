@@ -34,6 +34,7 @@ fi
 msg_info "Installing YunoHost (Patience)"
 touch /etc/.pve-ignore.resolv.conf
 curl -fsSLo /usr/share/keyrings/deb.sury.org-php.gpg https://packages.sury.org/php/apt.gpg
+# ALLOWED-RCE: Official YunoHost installer
 $STD bash <(curl -fsSL https://install.yunohost.org) -a
 msg_ok "Installed YunoHost"
 

@@ -31,6 +31,7 @@ fi
 NODE_VERSION="22" setup_nodejs
 
 msg_info "Installing ioBroker (Patience)"
+# ALLOWED-RCE: Official ioBroker installer
 $STD bash <(curl -fsSL https://iobroker.net/install.sh)
 msg_ok "Installed ioBroker"
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${SCRIPT_DIR}/misc/build.func"
 # Copyright (c) 2021-2025 community-scripts ORG
 # Author: Dominik Siebel (dsiebel)
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE

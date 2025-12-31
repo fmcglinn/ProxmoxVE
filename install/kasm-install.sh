@@ -14,6 +14,7 @@ network_check
 update_os
 
 msg_info "Installing Docker"
+# ALLOWED-RCE: Official Docker installer
 $STD sh <(curl -fsSL https://get.docker.com/)
 msg_ok "Installed Docker"
 

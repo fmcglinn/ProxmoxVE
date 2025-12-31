@@ -25,6 +25,7 @@ if [[ ! "$CONFIRM" =~ ^([yY][eE][sS]|[yY])$ ]]; then
 fi
 
 msg_info "Installing NextCloudPi (Patience)"
+# ALLOWED-RCE: Official NextcloudPi installer
 $STD bash <(curl -fsSL https://raw.githubusercontent.com/nextcloud/nextcloudpi/master/install.sh)
 msg_ok "Installed NextCloudPi"
 

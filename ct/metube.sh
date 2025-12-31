@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${SCRIPT_DIR}/misc/build.func"
 # Copyright (c) 2021-2025 community-scripts ORG
 # Author: MickLesk (Canbiz)
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
@@ -34,6 +35,7 @@ function update_script() {
     source ~/.bashrc
     if ! command -v deno &>/dev/null; then
       export DENO_INSTALL="/usr/local"
+      # ALLOWED-RCE: Official Deno installer
       curl -fsSL https://deno.land/install.sh | $STD sh -s -- -y
     else
       $STD deno upgrade

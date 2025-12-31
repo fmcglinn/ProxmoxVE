@@ -31,6 +31,7 @@ msg_ok "Installed Dependencies"
 msg_info "Installing Pi-hole"
 mkdir -p /etc/pihole
 touch /etc/pihole/pihole.toml
+# ALLOWED-RCE: Official Pi-hole installer
 $STD bash <(curl -fsSL https://install.pi-hole.net) --unattended
 sed -i -E '
 /^\s*upstreams =/ s|=.*|= ["8.8.8.8", "8.8.4.4"]|

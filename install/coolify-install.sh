@@ -31,6 +31,7 @@ if [[ ! "$CONFIRM" =~ ^([yY][eE][sS]|[yY])$ ]]; then
 fi
 
 msg_info "Installing Coolify (Patience - this installs Docker and pulls containers)"
+# ALLOWED-RCE: Official Coolify installer
 $STD bash <(curl -fsSL https://cdn.coollabs.io/coolify/install.sh)
 msg_ok "Installed Coolify"
 

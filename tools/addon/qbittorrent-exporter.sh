@@ -5,9 +5,9 @@
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 # Source: https://github.com/martabal/qbittorrent-exporter
 
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/core.func)
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/tools.func)
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/error_handler.func)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"; source "${SCRIPT_DIR}/misc/core.func"
+source "${SCRIPT_DIR}/misc/tools.func"
+source "${SCRIPT_DIR}/misc/error_handler.func"
 
 # Enable error handling
 set -Eeuo pipefail
@@ -169,7 +169,7 @@ EOF
   cat <<'UPDATEEOF' >/usr/local/bin/update_qbittorrent-exporter
 #!/usr/bin/env bash
 # qbittorrent-exporter Update Script
-type=update bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/addon/qbittorrent-exporter.sh)"
+type=update bash "${SCRIPT_DIR}/tools/addon/qbittorrent-exporter.sh"
 UPDATEEOF
   chmod +x /usr/local/bin/update_qbittorrent-exporter
   msg_ok "Created update script (/usr/local/bin/update_qbittorrent-exporter)"

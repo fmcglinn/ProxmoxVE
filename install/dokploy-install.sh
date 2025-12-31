@@ -32,6 +32,7 @@ if [[ ! "$CONFIRM" =~ ^([yY][eE][sS]|[yY])$ ]]; then
 fi
 
 msg_info "Installing Dokploy (Patience - this installs Docker and pulls containers)"
+# ALLOWED-RCE: Official Dokploy installer
 $STD bash <(curl -sSL https://dokploy.com/install.sh)
 msg_ok "Installed Dokploy"
 

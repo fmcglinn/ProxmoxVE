@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Git pre-commit hook for ProxmoxVE offline fork
+# Validates that no remote code execution patterns are introduced
+#
+# Installation:
+#   ln -sf ../../tools/git-hooks/pre-commit .git/hooks/pre-commit
+#   # OR
+#   cp tools/git-hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# Run RCE validation on staged files
+if [[ -x "${REPO_ROOT}/tools/validate-no-rce.sh" ]]; then
+  "${REPO_ROOT}/tools/validate-no-rce.sh" --staged
+  exit $?
+else
+  echo "Warning: validate-no-rce.sh not found or not executable"
+  exit 0
+fi

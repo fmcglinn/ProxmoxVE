@@ -28,6 +28,20 @@
 # ==============================================================================
 
 # ==============================================================================
+# OFFLINE MODE: DISABLE TELEMETRY
+# ==============================================================================
+# When telemetry is disabled, stub out all API functions to no-ops
+if [[ "${TELEMETRY_ENABLED:-false}" != "true" ]]; then
+  post_to_api() { return 0; }
+  post_to_api_vm() { return 0; }
+  post_update_to_api() { return 0; }
+  # explain_exit_code is still useful for error messages, so we keep it
+
+  # Skip the rest of this file (only define explain_exit_code below)
+  # We need explain_exit_code for error handling, so continue loading
+fi
+
+# ==============================================================================
 # SECTION 1: ERROR CODE DESCRIPTIONS
 # ==============================================================================
 
