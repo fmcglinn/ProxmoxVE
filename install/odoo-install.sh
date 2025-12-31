@@ -5,7 +5,7 @@
 # License: MIT |  https://github.com/tteck/Proxmox/raw/main/LICENSE
 # Source: https://github.com/odoo/odoo
 
-source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
+source "$FUNCTIONS_FILE_PATH"
 color
 verb_ip6
 catch_errors

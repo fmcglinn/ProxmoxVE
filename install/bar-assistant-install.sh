@@ -7,7 +7,7 @@
 # Source: https://github.com/karlomikus/vue-salt-rim
 # Source: https://www.meilisearch.com/
 
-source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
+source "$FUNCTIONS_FILE_PATH"
 color
 verb_ip6
 catch_errors

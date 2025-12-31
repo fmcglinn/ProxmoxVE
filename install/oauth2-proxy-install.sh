@@ -5,7 +5,7 @@
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 # Source: https://github.com/oauth2-proxy/oauth2-proxy/
 
-source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
+source "$FUNCTIONS_FILE_PATH"
 color
 verb_ip6
 catch_errors

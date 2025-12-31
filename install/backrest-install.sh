@@ -5,7 +5,7 @@
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 # Source: https://garethgeorge.github.io/backrest/
 
-source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
+source "$FUNCTIONS_FILE_PATH"
 color
 verb_ip6
 catch_errors

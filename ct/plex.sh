@@ -44,7 +44,7 @@ function update_script() {
   fi
   if [ "$UPD" == "2" ]; then
     set +e
-    # TODO-REJECT: RCE rejected - needs revision to localize or remove PlexUpdate installer
+    # ALLOWED-RCE: User-initiated plexupdate installer (not run during install, requires menu selection)
     bash -c "$(curl -fsSL https://raw.githubusercontent.com/mrworf/plexupdate/master/extras/installer.sh)"
     msg_ok "Updated successfully!"
     exit

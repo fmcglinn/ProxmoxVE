@@ -63,7 +63,45 @@ echo "  Errors:      ${errors}"
 echo ""
 
 # ==============================================================================
-# PHASE 2: VM DESCRIPTION TRANSFORMATION
+# PHASE 2: INSTALL SCRIPT TRANSFORMATION
+# ==============================================================================
+echo "=== Install Script Transformation ==="
+echo ""
+
+install_transformed=0
+install_skipped=0
+
+# Process all install scripts
+for script in "${REPO_ROOT}/install/"*.sh; do
+  [[ -f "$script" ]] || continue
+
+  filename=$(basename "$script")
+
+  # Check if already transformed (no stdin pattern)
+  if ! grep -q 'source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"' "$script" 2>/dev/null; then
+    echo "  [SKIP] ${filename} (already transformed or no pattern)"
+    ((install_skipped++)) || true
+    continue
+  fi
+
+  # Transform: source from stdin to direct file source
+  if sed -i 's|source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"|source "$FUNCTIONS_FILE_PATH"|' "$script" 2>/dev/null; then
+    echo "  [OK]   ${filename}"
+    ((install_transformed++)) || true
+  else
+    echo "  [ERR]  ${filename} (sed failed)"
+    ((errors++)) || true
+  fi
+done
+
+echo ""
+echo "=== Install Script Summary ==="
+echo "  Transformed: ${install_transformed}"
+echo "  Skipped:     ${install_skipped}"
+echo ""
+
+# ==============================================================================
+# PHASE 3: VM DESCRIPTION TRANSFORMATION
 # ==============================================================================
 echo "=== VM Description Transformation ==="
 echo ""
@@ -154,9 +192,10 @@ echo ""
 # FINAL SUMMARY
 # ==============================================================================
 echo "=== Final Summary ==="
-echo "  CT scripts transformed:  ${transformed}"
-echo "  VM scripts transformed:  ${vm_transformed}"
-echo "  Errors:                  ${errors}"
+echo "  CT scripts transformed:      ${transformed}"
+echo "  Install scripts transformed: ${install_transformed}"
+echo "  VM scripts transformed:      ${vm_transformed}"
+echo "  Errors:                      ${errors}"
 echo ""
 
 if [[ $errors -gt 0 ]]; then
