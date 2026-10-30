@@ -31,13 +31,7 @@ script="${ROOT}/ct/${app}.sh"
 
 # ── Pins ──────────────────────────────────────────────────────────────────────
 [[ -z "$(git -C "$ROOT" status --porcelain)" ]] || die "${ROOT} has local changes"
-[[ -d "${CORE}/.git" ]] || die "no core checkout at ${CORE} (run: cs-sync apply)"
-[[ -z "$(git -C "$CORE" status --porcelain)" ]] || die "${CORE} has local changes"
-[[ "$(git -C "$CORE" rev-parse HEAD~1 2>/dev/null)" == "$CORE_SHA" ]] ||
-  die "core is not pinned ${CORE_SHA:0:12} + patch (run: cs-sync apply)"
-want="$(git -C "$CORE" patch-id --stable <"${SAFE_DIR}/core-engine-copy.patch" | cut -d' ' -f1)"
-have="$(git -C "$CORE" diff HEAD~1 HEAD | git -C "$CORE" patch-id --stable | cut -d' ' -f1)"
-[[ -n "$want" && "$want" == "$have" ]] || die "core HEAD is not core-engine-copy.patch (run: cs-sync apply)"
+CS_CORE_DIR="$CORE" "${SAFE_DIR}/cs-sync" verify || exit 1
 
 # ── Hard-coded fetches ────────────────────────────────────────────────────────
 if ! "${SAFE_DIR}/check-remote-exec" "$script" "${ROOT}/install/${app}-install.sh"; then

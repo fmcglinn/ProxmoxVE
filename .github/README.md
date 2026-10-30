@@ -49,40 +49,57 @@ Then it points every script and engine path at local disk and turns telemetry of
 
 ## Update to newer upstream
 
-Review and pin on a workstation, then roll out to the host.
+Updates arrive as a pull request you review. Nothing reaches the host until you merge it.
 
-On the workstation, in your clone of this fork:
+### 1. The sync PR (automatic)
 
-```bash
-tools/safe/cs-sync update
-```
+Every Monday the [Safe upstream sync](workflows/safe-upstream-sync.yml)
+workflow merges upstream `main` into this branch and pins core to core's
+latest commit. It also checks that the local patch still applies, then opens a
+PR from `upstream-sync` into `safe-tooling`, or refreshes the one already open.
+To run it now: **Actions → Safe upstream sync → Run workflow**.
 
-It prints how many commits each repo moved and the commands to review them:
+The PR description shows how many commits each repo moved, and which apps are refused.
 
-```bash
-git -C ../core diff <old> <new>                                          # engine: runs as root everywhere
-git diff <old> <new> -- ct/<app>.sh install/<app>-install.sh              # each app you deploy
-```
+### 2. Review and merge (you)
 
-Read those, then answer `y`. It rebases this branch onto upstream `main`, pins
-core to its new commit, re-applies the patch and lists the refused apps. Pin
-a specific core commit instead of core's `main` with `cs-sync update <sha>`.
-
-Publish:
+Check out the PR branch, then review it:
 
 ```bash
-git push --force-with-lease origin safe-tooling
+git fetch origin && git switch --detach origin/upstream-sync
+tools/safe/cs-sync apply                                       # moves ../core to the new pin
+git -C ../core diff <old-core> <new-core>                      # engine: runs as root everywhere
+git diff origin/safe-tooling -- ct/<app>.sh install/<app>-install.sh   # each app you deploy
 ```
 
-The force push is expected: every update rebases this branch.
+The PR description gives the two core commits. Merge with **Create a merge
+commit**. Squash or rebase merges drop the link to upstream's history, and the
+next sync then conflicts.
 
-On the host:
+### 3. Roll out (host, automatic)
 
 ```bash
-cd /opt/community-scripts
-git -C ProxmoxVE pull --rebase
-ProxmoxVE/tools/safe/cs-sync apply
+cat >/etc/cron.d/cs-sync <<'EOF'
+30 4 * * * root git -C /opt/community-scripts/ProxmoxVE pull -q --ff-only && /opt/community-scripts/ProxmoxVE/tools/safe/cs-sync apply >/dev/null
+EOF
 ```
+
+The host only fast-forwards to what you merged. `cs-sync apply` does nothing
+when core is already correct.
+
+### Without the workflow
+
+`tools/safe/cs-sync update` does steps 1 and 2 in one go on a workstation. It
+prints the same review commands, asks before merging, then pins. Afterwards
+run `git push origin safe-tooling`. Add a core commit to pin a specific one:
+`cs-sync update <sha>`.
+
+### Inherited workflows
+
+The fork carries upstream's 21 workflow files. Several act on whatever repo
+they run in; one deletes branches daily. Each time the sync workflow runs,
+including on every push to `safe-tooling`, it first disables every workflow
+except itself. That also covers workflows that later upstream merges add.
 
 ## Refused apps
 
@@ -128,7 +145,8 @@ tools/safe/check-remote-exec
 | File | Purpose |
 | --- | --- |
 | `tools/safe/cs-run` | Runs one app from local disk after the checks above |
-| `tools/safe/cs-sync` | `apply`: builds the pinned core. `update`: review, rebase, re-pin |
+| `tools/safe/cs-sync` | `apply`: builds the pinned core. `verify`: checks it. `update`: review, merge upstream, re-pin |
+| `.github/workflows/safe-upstream-sync.yml` | Weekly sync PR, and disables every other workflow |
 | `tools/safe/pins.env` | The reviewed core commit |
 | `tools/safe/core-engine-copy.patch` | Copies the engine into the container before the install runs |
 | `tools/safe/check-remote-exec` | Lists hard-coded GitHub downloads |

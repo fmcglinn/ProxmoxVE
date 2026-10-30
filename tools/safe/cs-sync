@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Keep this checkout and ../core on reviewed, pinned commits.
 #
-#   cs-sync apply          Make ../core = CORE_SHA + core-engine-copy.patch,
-#                          cloning it if missing. Run on the PVE host after
-#                          pulling this branch.
-#   cs-sync update [sha]   Show what changed upstream, then rebase this branch
-#                          onto upstream/main and pin core to <sha> (default:
-#                          core's main), then apply.
+#   cs-sync apply                Make ../core = CORE_SHA + core-engine-copy.patch,
+#                                cloning it if missing. No-op when it already is.
+#                                Run on the PVE host after pulling this branch.
+#   cs-sync verify               Exit 0 if ../core is exactly that, else say why.
+#   cs-sync update [--yes] [sha] Show what changed upstream, then merge
+#                                upstream/main into this branch and pin core to
+#                                <sha> (default: core's main), then apply.
+#                                --yes skips the prompt (for the sync workflow).
 
 set -euo pipefail
 
@@ -32,9 +34,29 @@ clean() {
   [[ -z "$(git -C "$1" status --porcelain)" ]] || die "$1 has local changes"
 }
 
-core_apply() {
+load_pins() {
   # shellcheck source=pins.env
   source "${SAFE_DIR}/pins.env"
+}
+
+core_verify() {
+  load_pins
+  [[ -d "${CORE}/.git" ]] || die "no core checkout at ${CORE} (run: cs-sync apply)"
+  clean "$CORE"
+  [[ "$(git -C "$CORE" rev-parse HEAD~1 2>/dev/null)" == "$CORE_SHA" ]] ||
+    die "core is not pinned ${CORE_SHA:0:12} + patch (run: cs-sync apply)"
+  local want have
+  want="$(git -C "$CORE" patch-id --stable <"$PATCH" | cut -d' ' -f1)"
+  have="$(git -C "$CORE" diff HEAD~1 HEAD | git -C "$CORE" patch-id --stable | cut -d' ' -f1)"
+  [[ -n "$want" && "$want" == "$have" ]] || die "core HEAD is not core-engine-copy.patch (run: cs-sync apply)"
+}
+
+core_apply() {
+  load_pins
+  if (core_verify) 2>/dev/null; then
+    echo "core: ${CORE_SHA:0:12} + patch at ${CORE} (already applied)"
+    return 0
+  fi
   if [[ ! -d "${CORE}/.git" ]]; then
     git clone --quiet "$CORE_REPO" "$CORE"
   fi
@@ -49,11 +71,19 @@ core_apply() {
 }
 
 cmd_update() {
-  local new_core="${1:-}" base new_base
+  local yes=0 new_core="" base new_base
+  while (($#)); do
+    case "$1" in
+    --yes) yes=1 ;;
+    -*) die "unknown option: $1" ;;
+    *) new_core="$1" ;;
+    esac
+    shift
+  done
+
   clean "$ROOT"
   [[ -d "${CORE}/.git" ]] || core_apply
-  # shellcheck source=pins.env
-  source "${SAFE_DIR}/pins.env"
+  load_pins
 
   git -C "$ROOT" remote get-url upstream >/dev/null 2>&1 || git -C "$ROOT" remote add upstream "$UPSTREAM_REPO"
   git -C "$ROOT" fetch --quiet upstream
@@ -62,6 +92,11 @@ cmd_update() {
 
   git -C "$CORE" fetch --quiet origin
   new_core="$(git -C "$CORE" rev-parse --verify "${new_core:-origin/main}^{commit}")"
+
+  if [[ "$base" == "$new_base" && "$new_core" == "$CORE_SHA" ]]; then
+    echo "Already up to date: ProxmoxVE ${base:0:12}, core ${CORE_SHA:0:12}"
+    return 0
+  fi
 
   echo "ProxmoxVE ${base:0:12} -> ${new_base:0:12}: $(git -C "$ROOT" rev-list --count "${base}..${new_base}") commits"
   git -C "$ROOT" diff --stat "$base" "$new_base" -- ct install vm | tail -1
@@ -73,9 +108,16 @@ cmd_update() {
   echo "And each app you deploy:"
   echo "  git -C ${ROOT} diff ${base:0:12} ${new_base:0:12} -- ct/<app>.sh install/<app>-install.sh"
   echo
-  confirm "Rebase onto upstream/main and pin core ${new_core:0:12}?" || die "nothing changed"
+  if ((!yes)); then
+    confirm "Merge upstream/main and pin core ${new_core:0:12}?" || die "nothing changed"
+  fi
 
-  git -C "$ROOT" rebase --quiet upstream/main
+  if [[ "$base" != "$new_base" ]]; then
+    # tools/safe and .github/README.md are files upstream does not have, so the
+    # merge has nothing to conflict on unless upstream adds one of them.
+    git -C "$ROOT" merge --quiet --no-edit -m "Merge upstream ProxmoxVE ${new_base:0:12}" upstream/main ||
+      die "merge with upstream conflicted; resolve it in ${ROOT}"
+  fi
   if [[ "$new_core" != "$CORE_SHA" ]]; then
     local tmp
     tmp="$(mktemp)"
@@ -95,9 +137,10 @@ cmd_update() {
 
 case "${1:-}" in
 apply) core_apply ;;
+verify) core_verify ;;
 update)
   shift
   cmd_update "$@"
   ;;
-*) die "usage: cs-sync apply | cs-sync update [core-sha]" ;;
+*) die "usage: cs-sync apply | cs-sync verify | cs-sync update [--yes] [core-sha]" ;;
 esac

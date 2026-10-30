@@ -1,0 +1,91 @@
+# Weekly, or on demand: merge upstream ProxmoxVE, pin core to its latest
+# commit, and open (or refresh) a PR into safe-tooling for review. Nothing
+# reaches safe-tooling, and so nothing reaches the PVE host, until the PR is
+# merged by hand.
+#
+# Every run, including each push to safe-tooling, first disables every other
+# workflow in this repo. This fork inherits upstream's workflows, and several
+# act on whatever repo they run in (delete-merged-branches deletes branches
+# daily). Only this file may run here.
+name: Safe upstream sync
+
+on:
+  schedule:
+    - cron: "17 3 * * 1" # Mondays 03:17 UTC
+  workflow_dispatch:
+  push:
+    branches: [safe-tooling]
+
+permissions:
+  actions: write # disable other workflows
+  contents: write # push the upstream-sync branch
+  pull-requests: write
+
+concurrency:
+  group: safe-upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  disable-other-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disable every workflow except this one
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SELF_REF: ${{ github.workflow_ref }} # owner/repo/.github/workflows/x.yml@ref
+        run: |
+          self_path="${SELF_REF#*/*/}"
+          self_path="${self_path%@*}"
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows" \
+            --jq '.workflows[] | select(.state == "active") | "\(.id) \(.path)"' |
+            while read -r id path; do
+              # dynamic/* are GitHub's own (dependency graph); they cannot be disabled.
+              [[ "$path" == "$self_path" || "$path" == dynamic/* ]] && continue
+              echo "Disabling ${path}"
+              gh api --silent -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/${id}/disable"
+            done
+
+  sync:
+    needs: disable-other-workflows
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: safe-tooling
+          fetch-depth: 0
+
+      - name: Merge upstream and pin core
+        id: sync
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          before="$(git rev-parse HEAD)"
+          tools/safe/cs-sync update --yes | tee "${RUNNER_TEMP}/summary.txt"
+          if [[ "$(git rev-parse HEAD)" != "$before" ]]; then
+            echo "changed=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Open or refresh the PR
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git push --force origin HEAD:refs/heads/upstream-sync
+          {
+            echo "Automated by \`.github/workflows/safe-upstream-sync.yml\`. Review before merging:"
+            echo "nothing reaches the PVE host until this is merged."
+            echo
+            echo '```'
+            cat "${RUNNER_TEMP}/summary.txt"
+            echo '```'
+          } >"${RUNNER_TEMP}/body.md"
+          pr="$(gh pr list --head upstream-sync --base safe-tooling --state open --json number --jq '.[0].number // empty')"
+          if [[ -n "$pr" ]]; then
+            gh pr edit "$pr" --body-file "${RUNNER_TEMP}/body.md"
+          else
+            gh pr create --base safe-tooling --head upstream-sync \
+              --title "Upstream sync $(date -u +%F)" --body-file "${RUNNER_TEMP}/body.md"
+          fi
