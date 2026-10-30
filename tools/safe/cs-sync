@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# Keep this checkout and ../core on reviewed, pinned commits.
+#
+#   cs-sync apply          Make ../core = CORE_SHA + core-engine-copy.patch,
+#                          cloning it if missing. Run on the PVE host after
+#                          pulling this branch.
+#   cs-sync update [sha]   Show what changed upstream, then rebase this branch
+#                          onto upstream/main and pin core to <sha> (default:
+#                          core's main), then apply.
+
+set -euo pipefail
+
+SAFE_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+ROOT="$(cd "${SAFE_DIR}/../.." && pwd)"
+CORE="${CS_CORE_DIR:-$(cd "${ROOT}/.." && pwd)/core}"
+CORE_REPO="https://github.com/community-scripts/core.git"
+UPSTREAM_REPO="https://github.com/community-scripts/ProxmoxVE.git"
+PATCH="${SAFE_DIR}/core-engine-copy.patch"
+
+die() {
+  echo "cs-sync: $*" >&2
+  exit 1
+}
+
+confirm() {
+  local reply
+  read -r -p "$1 [y/N] " reply
+  [[ "$reply" == [yY] ]]
+}
+
+clean() {
+  [[ -z "$(git -C "$1" status --porcelain)" ]] || die "$1 has local changes"
+}
+
+core_apply() {
+  # shellcheck source=pins.env
+  source "${SAFE_DIR}/pins.env"
+  if [[ ! -d "${CORE}/.git" ]]; then
+    git clone --quiet "$CORE_REPO" "$CORE"
+  fi
+  clean "$CORE"
+  git -C "$CORE" cat-file -e "${CORE_SHA}^{commit}" 2>/dev/null || git -C "$CORE" fetch --quiet origin
+  git -C "$CORE" checkout --quiet -B safe "$CORE_SHA"
+  git -C "$CORE" apply --index "$PATCH" ||
+    die "core-engine-copy.patch does not apply to ${CORE_SHA:0:12}; refresh it against that commit"
+  git -C "$CORE" -c user.name=cs-sync -c user.email=cs-sync@localhost \
+    commit --quiet -m "Copy the engine into the container (local patch)"
+  echo "core: ${CORE_SHA:0:12} + patch at ${CORE}"
+}
+
+cmd_update() {
+  local new_core="${1:-}" base new_base
+  clean "$ROOT"
+  [[ -d "${CORE}/.git" ]] || core_apply
+  # shellcheck source=pins.env
+  source "${SAFE_DIR}/pins.env"
+
+  git -C "$ROOT" remote get-url upstream >/dev/null 2>&1 || git -C "$ROOT" remote add upstream "$UPSTREAM_REPO"
+  git -C "$ROOT" fetch --quiet upstream
+  base="$(git -C "$ROOT" merge-base HEAD upstream/main)"
+  new_base="$(git -C "$ROOT" rev-parse upstream/main)"
+
+  git -C "$CORE" fetch --quiet origin
+  new_core="$(git -C "$CORE" rev-parse --verify "${new_core:-origin/main}^{commit}")"
+
+  echo "ProxmoxVE ${base:0:12} -> ${new_base:0:12}: $(git -C "$ROOT" rev-list --count "${base}..${new_base}") commits"
+  git -C "$ROOT" diff --stat "$base" "$new_base" -- ct install vm | tail -1
+  echo "core      ${CORE_SHA:0:12} -> ${new_core:0:12}: $(git -C "$CORE" rev-list --count "${CORE_SHA}..${new_core}") commits"
+  git -C "$CORE" diff --stat "$CORE_SHA" "$new_core" | tail -1
+  echo
+  echo "Review before pinning. Core runs as root on the host and in every container:"
+  echo "  git -C ${CORE} diff ${CORE_SHA:0:12} ${new_core:0:12}"
+  echo "And each app you deploy:"
+  echo "  git -C ${ROOT} diff ${base:0:12} ${new_base:0:12} -- ct/<app>.sh install/<app>-install.sh"
+  echo
+  confirm "Rebase onto upstream/main and pin core ${new_core:0:12}?" || die "nothing changed"
+
+  git -C "$ROOT" rebase --quiet upstream/main
+  if [[ "$new_core" != "$CORE_SHA" ]]; then
+    local tmp
+    tmp="$(mktemp)"
+    sed "s/^CORE_SHA=.*/CORE_SHA=${new_core}/" "${SAFE_DIR}/pins.env" >"$tmp"
+    cat "$tmp" >"${SAFE_DIR}/pins.env"
+    rm -f "$tmp"
+    git -C "$ROOT" add tools/safe/pins.env
+    git -C "$ROOT" commit --quiet -m "Pin core ${new_core:0:12}"
+  fi
+  core_apply
+
+  local refused
+  refused="$("${SAFE_DIR}/check-remote-exec" "${ROOT}/ct" "${ROOT}/install" | cut -d: -f1 | sort -u || true)"
+  echo "cs-run will refuse $(grep -c . <<<"$refused") files that hard-code GitHub fetches:"
+  sed 's/^/  /' <<<"$refused"
+}
+
+case "${1:-}" in
+apply) core_apply ;;
+update)
+  shift
+  cmd_update "$@"
+  ;;
+*) die "usage: cs-sync apply | cs-sync update [core-sha]" ;;
+esac

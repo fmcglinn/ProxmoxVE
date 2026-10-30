@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Run ct/<app>.sh from this checkout with every script and engine file read
+# from local disk.
+#
+# Usage: cs-run <app> [args...]
+#
+# Refuses to start unless:
+#   - this checkout and ../core have no local changes
+#   - ../core is the pinned CORE_SHA plus core-engine-copy.patch (cs-sync apply)
+#   - ct/<app>.sh and install/<app>-install.sh hard-code no GitHub fetch
+
+set -euo pipefail
+
+SAFE_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+ROOT="$(cd "${SAFE_DIR}/../.." && pwd)"
+CORE="${CS_CORE_DIR:-$(cd "${ROOT}/.." && pwd)/core}"
+# shellcheck source=pins.env
+source "${SAFE_DIR}/pins.env"
+
+die() {
+  echo "cs-run: $*" >&2
+  exit 1
+}
+
+app="${1:-}"
+[[ -n "$app" ]] || die "usage: cs-run <app> [args...]   (runs ct/<app>.sh)"
+[[ "$app" =~ ^[a-z0-9][a-z0-9._-]*$ ]] || die "invalid app name: ${app}"
+shift
+script="${ROOT}/ct/${app}.sh"
+[[ -f "$script" ]] || die "no such script: ct/${app}.sh"
+
+# ── Pins ──────────────────────────────────────────────────────────────────────
+[[ -z "$(git -C "$ROOT" status --porcelain)" ]] || die "${ROOT} has local changes"
+[[ -d "${CORE}/.git" ]] || die "no core checkout at ${CORE} (run: cs-sync apply)"
+[[ -z "$(git -C "$CORE" status --porcelain)" ]] || die "${CORE} has local changes"
+[[ "$(git -C "$CORE" rev-parse HEAD~1 2>/dev/null)" == "$CORE_SHA" ]] ||
+  die "core is not pinned ${CORE_SHA:0:12} + patch (run: cs-sync apply)"
+want="$(git -C "$CORE" patch-id --stable <"${SAFE_DIR}/core-engine-copy.patch" | cut -d' ' -f1)"
+have="$(git -C "$CORE" diff HEAD~1 HEAD | git -C "$CORE" patch-id --stable | cut -d' ' -f1)"
+[[ -n "$want" && "$want" == "$have" ]] || die "core HEAD is not core-engine-copy.patch (run: cs-sync apply)"
+
+# ── Hard-coded fetches ────────────────────────────────────────────────────────
+if ! "${SAFE_DIR}/check-remote-exec" "$script" "${ROOT}/install/${app}-install.sh"; then
+  die "refusing ${app}: the lines above fetch code from GitHub main directly"
+fi
+
+# ── Telemetry off ─────────────────────────────────────────────────────────────
+diag=/usr/local/community-scripts/diagnostics
+mkdir -p "${diag%/*}"
+if [[ -f "$diag" ]] && grep -q '^DIAGNOSTICS=' "$diag"; then
+  sed -i 's/^DIAGNOSTICS=.*/DIAGNOSTICS=no/' "$diag"
+else
+  echo "DIAGNOSTICS=no" >>"$diag"
+fi
+
+# ── Local roots ───────────────────────────────────────────────────────────────
+# file:// bases mean any fallback to the "remote" path reads local disk, and
+# fails rather than reaching GitHub if the file is not there. Setting them also
+# stops core deriving a GitHub URL from this checkout's git remote.
+export COMMUNITY_SCRIPTS_ROOT="$ROOT"
+export COMMUNITY_SCRIPTS_CORE_DIR="$CORE"
+export COMMUNITY_SCRIPTS_URL="file://${ROOT}"
+export COMMUNITY_SCRIPTS_CORE_URL="file://${CORE}"
+export COMMUNITY_SCRIPTS_NO_PREFETCH=1
+export DIAGNOSTICS=no
+export TELEMETRY_URL="file:///dev/null"
+
+echo "cs-run: ${app} from $(git -C "$ROOT" rev-parse --short HEAD), core ${CORE_SHA:0:12}+patch"
+exec bash "$script" "$@"

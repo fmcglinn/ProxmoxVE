@@ -1,0 +1,24 @@
+diff --git a/pve/backend.func b/pve/backend.func
+index 009326b..86527bb 100644
+--- a/pve/backend.func
++++ b/pve/backend.func
+@@ -1413,6 +1413,19 @@ PROFILE
+     install_ssh_keys_into_ct
+     start_install_timer
+ 
++    # The installer inside the container reads the engine from
++    # COMMUNITY_SCRIPTS_CORE_DIR when that directory exists there, and fetches it
++    # from COMMUNITY_SCRIPTS_CORE_URL otherwise. lxc-attach carries the host path
++    # across, so copy the engine to the same path and nothing is fetched.
++    if [[ -n "${COMMUNITY_SCRIPTS_CORE_DIR:-}" && -d "${COMMUNITY_SCRIPTS_CORE_DIR}/core" ]]; then
++      if ! pct exec "$CTID" -- mkdir -p "$COMMUNITY_SCRIPTS_CORE_DIR" ||
++        ! tar -C "$COMMUNITY_SCRIPTS_CORE_DIR" -cf - core api lib |
++        pct exec "$CTID" -- tar -C "$COMMUNITY_SCRIPTS_CORE_DIR" -xf -; then
++        msg_error "Could not copy the engine into container ${CTID}"
++        exit 1
++      fi
++    fi
++
+     export CONTAINER_INSTALLING=true
+ 
+     local _install_script

@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# List lines that fetch code straight from community-scripts on GitHub.
+#
+# cs-run points COMMUNITY_SCRIPTS_URL and COMMUNITY_SCRIPTS_CORE_URL at local
+# disk, so every fetch that goes through those variables stays local. A
+# hard-coded raw.githubusercontent.com URL ignores them and pulls from main at
+# run time. This finds those.
+#
+# Usage: check-remote-exec [file|dir ...]   (default: ct install vm tools)
+# Exit:  0 none found, 1 found (printed as path:line:text)
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../.." && pwd)"
+
+URL_RE='(raw\.githubusercontent\.com/community-scripts/|github\.com/community-scripts/[^/]+/raw/)'
+# A line is a fetch when it names a downloader or stores the URL for one.
+FETCH_RE='(curl|wget|ADDON_SCRIPT=)'
+# The ct/ bootstrap fallback reads COMMUNITY_SCRIPTS_CORE_URL, which cs-run sets.
+BOOTSTRAP_RE='COMMUNITY_SCRIPTS_CORE_URL:-'
+# Comments, and hints echoed to the user, run nothing.
+INERT_RE='^[[:space:]]*(#|echo[[:space:]])'
+
+if (($# == 0)); then
+  set -- "$ROOT/ct" "$ROOT/install" "$ROOT/vm" "$ROOT/tools"
+fi
+
+targets=()
+for t in "$@"; do
+  [[ -e "$t" ]] && targets+=("$t")
+done
+((${#targets[@]})) || exit 0
+
+found="$(grep -rn -E "$URL_RE" --include='*.sh' --include='*.func' "${targets[@]}" 2>/dev/null |
+  grep -E "$FETCH_RE" |
+  grep -v -E "$BOOTSTRAP_RE" |
+  awk -F: -v inert="$INERT_RE" '{ text = $0; sub(/^[^:]*:[^:]*:/, "", text); if (text !~ inert) print }' |
+  grep -v "^$ROOT/tools/safe/" || true)"
+
+[[ -z "$found" ]] && exit 0
+printf '%s\n' "${found//"$ROOT/"/}"
+exit 1
