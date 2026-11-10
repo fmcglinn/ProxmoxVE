@@ -6,7 +6,7 @@
 # https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 
 header_info() {
-  clear
+  clear 2>/dev/null || printf '\033[H\033[2J\033[3J'
   cat <<"EOF"
     ____ _    ________   ____             __     ____           __        ____
    / __ \ |  / / ____/  / __ \____  _____/ /_   /  _/___  _____/ /_____ _/ / /
@@ -81,7 +81,7 @@ main() {
     case $yn in
     [Yy]*) break ;;
     [Nn]*)
-      clear
+      clear 2>/dev/null || printf '\033[H\033[2J\033[3J'
       exit
       ;;
     *) echo "Please answer yes or no." ;;
@@ -226,9 +226,8 @@ start_routines_9() {
         [[ -n "$list_files" ]] && MSG+="$(echo "$list_files" | sed 's|^| - |')\n"
         MSG+="\nDo you want to disable (comment out/rename) all legacy sources and use ONLY deb822 .sources format?\n\nRecommended for Proxmox VE 9."
 
-        whiptail --backtitle "Proxmox VE Helper Scripts" --title "Disable legacy sources?" \
-          --yesno "$MSG" 18 80
-        if [[ $? -eq 0 ]]; then
+        if whiptail --backtitle "Proxmox VE Helper Scripts" --title "Disable legacy sources?" \
+          --yesno "$MSG" 18 80; then
           # Backup and disable sources.list
           if [[ -f "$listfile" ]] && grep -qE '^\s*deb ' "$listfile"; then
             cp "$listfile" "$listfile.bak"

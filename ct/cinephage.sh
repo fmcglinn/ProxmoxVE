@@ -36,7 +36,7 @@ function update_script() {
     systemctl stop cinephage
     msg_ok "Stopped Cinephage"
 
-    NODE_VERSION="24" setup_nodejs
+    NODE_VERSION="26" setup_nodejs
     CLEAN_INSTALL=1 fetch_and_deploy_gh_release "cinephage" "MoldyTaint/Cinephage" "tarball"
 
     msg_info "Building Cinephage"
@@ -48,7 +48,7 @@ function update_script() {
     msg_ok "Built Cinephage"
 
     msg_info "Updating Camoufox"
-    $STD /opt/cinephage/node_modules/.bin/camoufox-js fetch
+    $STD /opt/cinephage/node_modules/.bin/camoufox fetch
     msg_ok "Updated Camoufox"
 
     msg_info "Starting Cinephage"

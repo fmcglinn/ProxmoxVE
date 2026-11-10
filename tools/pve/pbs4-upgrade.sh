@@ -5,7 +5,7 @@
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 
 header_info() {
-  clear
+  clear 2>/dev/null || printf '\033[H\033[2J\033[3J'
   cat <<"EOF"
     ____  ____ _____ __ __     __  __                           __   
    / __ \/ __ ) ___// // /    / / / /___  ____ __________ _____/ /__ 
@@ -192,12 +192,17 @@ while true; do
   case $yn in
   [Yy]*) break ;;
   [Nn]*)
-    clear
+    clear 2>/dev/null || printf '\033[H\033[2J\033[3J'
     exit
     ;;
   *) echo "Please answer yes or no." ;;
   esac
 done
+
+if command -v pveversion >/dev/null 2>&1; then
+  echo -e "\n🛑  PVE Detected, Wrong Script!\n"
+  exit 232
+fi
 
 if [ "$(dpkg --print-architecture 2>/dev/null)" = "arm64" ]; then
   header_info

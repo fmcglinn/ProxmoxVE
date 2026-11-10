@@ -24,7 +24,7 @@ $STD apt install -y \
 msg_ok "Installed Dependencies"
 
 setup_ffmpeg
-NODE_VERSION="24" setup_nodejs
+NODE_VERSION="26" setup_nodejs
 fetch_and_deploy_gh_release "cinephage" "MoldyTaint/Cinephage" "tarball"
 
 msg_info "Building Cinephage"
@@ -35,7 +35,7 @@ $STD npm prune --omit=dev
 msg_ok "Built Cinephage"
 
 msg_info "Installing Camoufox"
-$STD /opt/cinephage/node_modules/.bin/camoufox-js fetch
+$STD /opt/cinephage/node_modules/.bin/camoufox fetch
 msg_ok "Installed Camoufox"
 
 msg_info "Configuring Cinephage"
