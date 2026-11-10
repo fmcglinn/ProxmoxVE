@@ -6,7 +6,7 @@
 # https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 
 function header_info() {
-  clear
+  clear 2>/dev/null || printf '\033[H\033[2J\033[3J'
   cat <<"EOF"
      ______                     __          __   _  ________
    / ____/  _____  _______  __/ /____     / /  | |/ / ____/
@@ -67,7 +67,7 @@ for container in $(pct list | awk '{if(NR>1) print $1}'); do
   else
     os=$(pct config "$container" | awk '/^ostype/ {print $2}')
     if [ "$os" != "debian" ] && [ "$os" != "ubuntu" ]; then
-      echo -e "${BL}[Info]${GN} Skipping ${name} ${RD}$container is not Debian or Ubuntu ${CL}"
+      echo -e "${BL}[Info]${GN} Skipping ${RD}$container is not Debian or Ubuntu ${CL}"
       continue
     fi
 

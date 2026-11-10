@@ -51,16 +51,42 @@ function update_script() {
   cd /opt/discourse
   export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"
   export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+  export BUNDLE_SILENCE_ROOT_WARNING=1
   set -a
   source /opt/discourse/.env
   set +a
   $STD git pull origin main
-  $STD bundle install
+  msg_ok "Updated Discourse"
+
+  if check_for_gh_release "libvips" "libvips/libvips"; then
+    ensure_dependencies meson ninja-build pkg-config libglib2.0-dev libexpat1-dev libjpeg-dev libpng-dev libwebp-dev libtiff-dev libheif-dev libjxl-dev librsvg2-dev libcgif-dev libexif-dev liblcms2-dev liborc-0.4-dev libimagequant-dev libpango1.0-dev
+    CLEAN_INSTALL=1 fetch_and_deploy_gh_release "libvips" "libvips/libvips" "prebuild" "latest" "/opt/libvips" "vips-*.tar.xz"
+    msg_info "Building libvips"
+    cd /opt/libvips
+    $STD meson setup build --prefix=/usr/local --libdir=lib --buildtype=release -Dmodules=disabled -Dmagick=disabled -Dexamples=false
+    $STD ninja -C build install
+    ldconfig
+    msg_ok "Built libvips"
+  fi
+
+  msg_info "Updating Dependencies"
+  RUBY_TARGET=$(grep -A1 '^RUBY VERSION' /opt/discourse/Gemfile.lock | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+  RUBY_VERSION="${RUBY_TARGET:-4.0.7}" RUBY_INSTALL_RAILS="false" setup_ruby
+  export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"
+  hash -r
+  cd /opt/discourse
+  $STD bundle install -j"$(nproc)"
   $STD pnpm install
+  msg_ok "Updated Dependencies"
+
+  msg_info "Running Database Migrations"
   $STD runuser -u postgres -- psql -d discourse -c "CREATE EXTENSION IF NOT EXISTS vector;"
   $STD bundle exec rails db:migrate
+  msg_ok "Ran Database Migrations"
+
+  msg_info "Precompiling Assets"
   $STD bundle exec rails assets:precompile
-  msg_ok "Updated Discourse"
+  msg_ok "Precompiled Assets"
 
   msg_info "Starting Services"
   systemctl start discourse discourse-sidekiq

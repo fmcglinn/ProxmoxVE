@@ -75,7 +75,7 @@ EOF
   BASE_DIR=${STAGING_DIR}/base-images
   SOURCE_DIR=${STAGING_DIR}/image-source
   cd /tmp
-  RELEASE="v3.3.5"
+  RELEASE="v3.3.6"
   if [[ -f ~/.intel_version ]]; then
     INTEL_SRC="https://raw.githubusercontent.com/immich-app/immich/${RELEASE}/machine-learning"
     curl -fsSL "${INTEL_SRC}/scripts/install-intel-runtime.sh" -o ./intel-runtime 2>/dev/null ||
@@ -131,7 +131,18 @@ EOF
 
   if check_for_gh_release "Immich" "immich-app/immich" "${RELEASE}" "each release is tested individually before the version is updated. Please do not open issues for this"; then
     msg_warn "The update takes 5-15 minutes, do not interrupt it"
-    PREV_IMMICH="$(cat ~/.immich)"
+    PREV_IMMICH="${CS_PREVIOUS_VERSION:-$(cat ~/.immich)}"
+    INSTALL_DIR="/opt/${APP}"
+    UPLOAD_DIR="$(sed -n '/^IMMICH_MEDIA_LOCATION/s/[^=]*=//p' /opt/immich/.env)"
+    SRC_DIR="${INSTALL_DIR}/source"
+    APP_DIR="${INSTALL_DIR}/app"
+    PLUGIN_DIR="${APP_DIR}/plugins/immich-plugin-core"
+    ML_DIR="${APP_DIR}/machine-learning"
+    GEO_DIR="${INSTALL_DIR}/geodata"
+
+    setup_uv
+    CLEAN_INSTALL=1 fetch_and_deploy_gh_release "Immich" "immich-app/immich" "tarball" "${RELEASE}" "$SRC_DIR"
+
     # An interrupted update leaves app/ empty, so there may be no immich-admin to call.
     if [[ "$PREV_IMMICH" > "2.5.1" && -x /opt/immich/app/bin/immich-admin ]]; then
       msg_info "Enabling Maintenance Mode"
@@ -141,6 +152,7 @@ EOF
       $STD cd -
       msg_ok "Enabled Maintenance Mode"
     fi
+    [[ -x /opt/immich/app/bin/immich-admin ]] || export MAINT_MODE=1
     msg_info "Stopping Services"
     systemctl stop immich-web
     systemctl stop immich-ml
@@ -149,13 +161,13 @@ EOF
     PG_VERSION=$(ls /etc/postgresql/ 2>/dev/null | sort -V | tail -1)
     PG_VERSION=${PG_VERSION:-16}
     [[ -f ~/.vchord_version ]] && mv ~/.vchord_version ~/.vectorchord
-    if check_for_gh_release "VectorChord" "tensorchord/VectorChord" "${VCHORD_RELEASE}" "updated together with Immich after testing"; then
+    if check_for_gh_release "VectorChord" "supervc-stack/VectorChord" "${VCHORD_RELEASE}" "updated together with Immich after testing"; then
       # dead tuples in smart_search/face_search make the REINDEX below fail with
       # "missing chunk ... for toast value" on VectorChord 1.0.0 (#15588); must vacuum
       # while still on the old extension version, a post-upgrade vacuum errors instead
       $STD sudo -u postgres psql -d immich -c "VACUUM (ANALYZE) smart_search;"
       $STD sudo -u postgres psql -d immich -c "VACUUM (ANALYZE) face_search;"
-      fetch_and_deploy_gh_release "VectorChord" "tensorchord/VectorChord" "binary" "${VCHORD_RELEASE}" "/tmp" "postgresql-${PG_VERSION}-vchord_*_$(arch_resolve).deb"
+      fetch_and_deploy_gh_release "VectorChord" "supervc-stack/VectorChord" "binary" "${VCHORD_RELEASE}" "/tmp" "postgresql-${PG_VERSION}-vchord_*_$(arch_resolve).deb"
       systemctl restart postgresql
       $STD sudo -u postgres psql -d immich -c "ALTER EXTENSION vector UPDATE;"
       $STD sudo -u postgres psql -d immich -c "ALTER EXTENSION vchord UPDATE;"
@@ -163,14 +175,6 @@ EOF
       $STD sudo -u postgres psql -d immich -c "REINDEX INDEX clip_index;"
     fi
     ensure_dependencies ccache gcc-13 g++-13
-
-    INSTALL_DIR="/opt/${APP}"
-    UPLOAD_DIR="$(sed -n '/^IMMICH_MEDIA_LOCATION/s/[^=]*=//p' /opt/immich/.env)"
-    SRC_DIR="${INSTALL_DIR}/source"
-    APP_DIR="${INSTALL_DIR}/app"
-    PLUGIN_DIR="${APP_DIR}/plugins/immich-plugin-core"
-    ML_DIR="${APP_DIR}/machine-learning"
-    GEO_DIR="${INSTALL_DIR}/geodata"
 
     [[ -f "$ML_DIR"/ml_start.sh ]] && cp "$ML_DIR"/ml_start.sh "$INSTALL_DIR"
     if grep -qs "set -a" "$APP_DIR"/bin/start.sh && grep -qs "warnings" "$APP_DIR"/bin/start.sh; then
@@ -193,8 +197,6 @@ EOF
       rm -rf "${APP_DIR:?}"/*
     )
 
-    setup_uv
-    CLEAN_INSTALL=1 fetch_and_deploy_gh_release "Immich" "immich-app/immich" "tarball" "${RELEASE}" "$SRC_DIR"
     PNPM_VERSION="$(jq -r '.packageManager | split("@")[1] | split("+")[0]' ${SRC_DIR}/package.json)"
     export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
     export CI=1
@@ -232,7 +234,7 @@ EOF
     # plugins
     cd "$SRC_DIR"
     export MISE_TRUSTED_CONFIG_PATHS="$SRC_DIR"/mise.toml
-    export MISE_DISABLE_TOOLS=github:jellyfin/jellyfin-ffmpeg
+    export MISE_DISABLE_TOOLS=github:jellyfin/jellyfin-ffmpeg,java,terragrunt,opentofu,npm:@openapitools/openapi-generator-cli
     export MISE_LOCKFILE_MODE=merge MISE_LOCKFILE_PLATFORMS="linux-$(arch_resolve x64 arm64)"
     mise_ok=0
     for i in 1 2 3; do
@@ -292,7 +294,7 @@ EOF
       msg_ok "Pre-installed Python ${ML_PYTHON}"
       msg_info "Updating Intel OpenVINO machine-learning"
       for attempt in $(seq 1 3); do
-        $STD sudo --preserve-env=VIRTUAL_ENV,UV_HTTP_TIMEOUT,UV_CONCURRENT_DOWNLOADS,UV_CONCURRENT_BUILDS,UV_CONCURRENT_INSTALLS -Pnu immich uv sync --extra openvino --no-dev --active --link-mode copy -n -p "${ML_PYTHON}" --managed-python && break
+        $STD sudo --preserve-env=VIRTUAL_ENV,UV_HTTP_TIMEOUT,UV_CONCURRENT_DOWNLOADS,UV_CONCURRENT_BUILDS,UV_CONCURRENT_INSTALLS -Pnu immich uv sync --extra openvino --no-dev --upgrade-package watchfiles --active --link-mode copy -n -p "${ML_PYTHON}" --managed-python && break
         [[ $attempt -eq 3 ]] && { ML_FAILED=1; break; }
         # Parallel fetches can trip DNS rate limits (AdGuard, Pi-hole); retry one at a time.
         export UV_CONCURRENT_DOWNLOADS=1 UV_CONCURRENT_BUILDS=1 UV_CONCURRENT_INSTALLS=1
@@ -310,7 +312,7 @@ EOF
       msg_ok "Pre-installed Python ${ML_PYTHON}"
       msg_info "Updating machine-learning"
       for attempt in $(seq 1 3); do
-        $STD sudo --preserve-env=VIRTUAL_ENV,UV_HTTP_TIMEOUT,UV_CONCURRENT_DOWNLOADS,UV_CONCURRENT_BUILDS,UV_CONCURRENT_INSTALLS -Pnu immich uv sync --extra cpu --no-dev --active --link-mode copy -n -p "${ML_PYTHON}" --managed-python && break
+        $STD sudo --preserve-env=VIRTUAL_ENV,UV_HTTP_TIMEOUT,UV_CONCURRENT_DOWNLOADS,UV_CONCURRENT_BUILDS,UV_CONCURRENT_INSTALLS -Pnu immich uv sync --extra cpu --no-dev --upgrade-package watchfiles --active --link-mode copy -n -p "${ML_PYTHON}" --managed-python && break
         [[ $attempt -eq 3 ]] && { ML_FAILED=1; break; }
         # Parallel fetches can trip DNS rate limits (AdGuard, Pi-hole); retry one at a time.
         export UV_CONCURRENT_DOWNLOADS=1 UV_CONCURRENT_BUILDS=1 UV_CONCURRENT_INSTALLS=1
@@ -419,7 +421,7 @@ function compile_libjxl() {
     $STD git clone https://github.com/libjxl/libjxl.git "$SOURCE"
     cd "$SOURCE"
     $STD git reset --hard "$LIBJXL_REVISION"
-    $STD git submodule update --init --recursive --depth 1 --recommend-shallow
+    $STD git submodule update --init --recursive --depth 1 --recommend-shallow -- third_party
     mkdir build
     cd build
     $STD cmake \

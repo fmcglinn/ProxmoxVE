@@ -70,7 +70,9 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/planka
-ExecStart=/usr/bin/npm start --prod
+Environment=NODE_ENV=production
+Environment=HOME=/root
+ExecStart=/usr/bin/node app.js --prod
 Restart=always
 
 [Install]
