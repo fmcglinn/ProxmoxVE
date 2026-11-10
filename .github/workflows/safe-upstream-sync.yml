@@ -85,6 +85,9 @@ jobs:
         if: steps.sync.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          # cs-sync adds an `upstream` remote, and gh prefers that remote over
+          # origin, so without this gh would target community-scripts/ProxmoxVE.
+          GH_REPO: ${{ github.repository }}
         run: |
           git push --force origin HEAD:refs/heads/upstream-sync
           {
